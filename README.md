@@ -196,6 +196,7 @@ Both classes' styles have zero specificity, so the host's own CSS always wins.
 - **Hosts without children:** elements that can't have children, such as `img` and `input`, can't be hosts.
 - **Content hides the wave:** opaque backgrounds on the host's content cover it. Light host backgrounds wash it out, because the rim is added on top of what's below.
 - **Reduced motion:** with `prefers-reduced-motion: reduce`, nothing is shown, `play()` resolves at once and `onStart` / `onEnd` aren't called.
+- **No animation support:** where `getAnimations` or `matchMedia` don't exist, such as jsdom in Vitest or Jest, nothing animates and `play()` settles at once, calling `onStart` and `onEnd`. Tests don't need stand-ins for them.
 - **Content-Security-Policy:** a `style-src` without `'unsafe-inline'` blocks the injected styles, and the wave doesn't show.
 - **Shadow DOM:** the styles go into the document, so hosts inside a shadow root aren't styled.
 - **Browsers:** tested in Chrome and Safari. Firefox is untested.

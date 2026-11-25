@@ -40,6 +40,10 @@ function trackPresses(doc) {
   doc.addEventListener('keydown', () => { lastPress = null; }, true);
 }
 
+// test environments such as jsdom have neither; there play() settles at once
+const reducedMotion = doc => !!doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const animationsOf = el => el.getAnimations?.({ subtree: true }) ?? [];
+
 const hasPoint = e => typeof e?.clientX === 'number' && !!(e.clientX || e.clientY);
 const clamp = (v, max) => Math.min(Math.max(v, 0), max);
 
@@ -120,7 +124,7 @@ export function createShimmerling(host, options = {}) {
 
   function play(from) {
     if (playing) return playing;
-    if (destroyed || matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+    if (destroyed || reducedMotion(host.ownerDocument)) return Promise.resolve();
 
     const cs = getComputedStyle(host);
     const w = host.offsetWidth, h = host.offsetHeight, size = Math.max(w, h, 1);
@@ -150,7 +154,7 @@ export function createShimmerling(host, options = {}) {
     layer.classList.add('is-playing');
     opts.onStart?.();
 
-    playing = Promise.allSettled(layer.getAnimations({ subtree: true }).map(a => a.finished)).then(() => {
+    playing = Promise.allSettled(animationsOf(layer).map(a => a.finished)).then(() => {
       layer.classList.remove('is-playing');
       playing = null;
       if (!destroyed) opts.onEnd?.();
@@ -188,7 +192,7 @@ export function createShimmerling(host, options = {}) {
     destroy() {
       destroyed = true;
       document.removeEventListener('click', onDocClick);
-      layer.getAnimations({ subtree: true }).forEach(a => a.cancel());
+      animationsOf(layer).forEach(a => a.cancel());
       if (ownLayer) layer.remove();
       else { layer.replaceChildren(); layer.className = 'shimmerling-layer'; layer.removeAttribute('style'); }
       host.classList.remove('shimmerling', 'shimmerling-static');
