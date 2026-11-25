@@ -1,0 +1,148 @@
+/*
+  Shimmerling: an iridescent wave that sweeps across a container's background.
+  core.js injects it into the page. Content stays on top, untouched.
+
+  Knobs, set on the host element (all optional). The colors option sets the colour ones for you:
+    --shimmerling-a, -b          outer rim colours
+    --shimmerling-c, -d          inner rim colours
+    --shimmerling-core           bright line in the rim
+    --shimmerling-fill           tint left behind the front
+    --shimmerling-e1, -e2, -e3   border glow colours
+    --shimmerling-width          rim thickness (default scales with the host, max 110px)
+    --shimmerling-warp           how far the front bends, unitless px (default scales with the host)
+    --shimmerling-speed          how long the front takes to cross (default .45s)
+    --shimmerling-tail           how long the tint behind the front lingers (default 1.25s)
+    --shimmerling-glow           how long the border glow keeps animating, fade-out included (default 2.4s)
+    --shimmerling-glow-fade      how long its fade-out takes, at the end of --shimmerling-glow (default 1.8s)
+*/
+
+@property --_shimmerling-r     { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --_shimmerling-t     { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --_shimmerling-angle { syntax: '<angle>';  inherits: true; initial-value: 0deg; }
+@property --_shimmerling-o     { syntax: '<number>'; inherits: false; initial-value: 0; }
+
+/* zero specificity, so the host's own styles always win */
+:where(.shimmerling) { isolation: isolate; }
+:where(.shimmerling-static) { position: relative; }
+
+.shimmerling-layer {
+  --_a: var(--shimmerling-a, #ff4fa3);
+  --_b: var(--shimmerling-b, #ff9a3d);
+  --_c: var(--shimmerling-c, #8b6cff);
+  --_d: var(--shimmerling-d, #35b9e6);
+  --_core: var(--shimmerling-core, #fff3ee);
+  --_fill: var(--shimmerling-fill, rgb(40 18 72 / .55));
+  --_e1: var(--shimmerling-e1, #f5b638);
+  --_e2: var(--shimmerling-e2, #4aa8ff);
+  --_e3: var(--shimmerling-e3, #b25cff);
+  --_w: var(--shimmerling-width, var(--_auto-w, 110px));
+  --_speed: var(--shimmerling-speed, .45s);
+  --_tail: var(--shimmerling-tail, 1.25s);
+  --_glow: var(--shimmerling-glow, 2.4s);
+  --_glow-fade: min(var(--shimmerling-glow-fade, 1.8s), var(--_glow));
+
+  /* set by core.js per run: origin, distance to the farthest corner, warp padding */
+  --_ox: var(--_x, 50%);
+  --_oy: var(--_y, 100%);
+
+  /* border box: the layer reaches over the host's border (core.js sets the widths) */
+  position: absolute;
+  inset: calc(var(--_bt, 0px) * -1) calc(var(--_br, 0px) * -1) calc(var(--_bb, 0px) * -1) calc(var(--_bl, 0px) * -1);
+  z-index: -1;            /* above the host's background and border, below its content */
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.shimmerling-layer.is-playing {
+  visibility: visible;
+  animation:
+    shimmerling-front var(--_speed) cubic-bezier(.35, .05, .3, 1) forwards,
+    shimmerling-tail var(--_tail) ease-out forwards;
+}
+@keyframes shimmerling-front { to { --_shimmerling-r: calc(var(--_far) + var(--_w) * 1.25 + var(--_pad) * .7); } }
+@keyframes shimmerling-tail  { 0%, 38% { --_shimmerling-t: 1; } 100% { --_shimmerling-t: 0; } }
+
+.shimmerling-layer > i { position: absolute; inset: 0; border-radius: inherit; }
+
+/* fill and rim share one noise warp, which makes the front uneven */
+.shimmerling-warp {
+  --_ox: calc(var(--_x) + var(--_pad));
+  --_oy: calc(var(--_y) + var(--_pad));
+  position: absolute;
+  inset: calc(var(--_pad) * -1);
+}
+.shimmerling-warp i { position: absolute; inset: 0; }
+/* Safari only paints the visible part of a clipped element into its filter, so the warp pulls in blank pixels at the edges; its own compositing layer paints it whole */
+.shimmerling-layer.is-playing .shimmerling-warp { will-change: transform; }
+
+.shimmerling-fill {
+  opacity: var(--_shimmerling-t);
+  background: radial-gradient(circle at var(--_ox) var(--_oy), var(--_fill) calc(var(--_shimmerling-r) - var(--_w) * 1.1), transparent calc(var(--_shimmerling-r) - var(--_w) * .3));
+}
+
+/* rim: cool inner band, core line, warm outer band with a wide halo; hue varies by angle */
+.shimmerling-rings { filter: blur(4px); mix-blend-mode: screen; mix-blend-mode: plus-lighter; }
+.shimmerling-ring-cool {
+  background: conic-gradient(from 180deg at var(--_ox) var(--_oy), var(--_d), var(--_c) 25%, var(--_d) 75%, var(--_d));
+  -webkit-mask-image: radial-gradient(circle at var(--_ox) var(--_oy), transparent calc(var(--_shimmerling-r) - var(--_w) * 1.1), #000c calc(var(--_shimmerling-r) - var(--_w) * .55), transparent calc(var(--_shimmerling-r) - var(--_w) * .15));
+          mask-image: radial-gradient(circle at var(--_ox) var(--_oy), transparent calc(var(--_shimmerling-r) - var(--_w) * 1.1), #000c calc(var(--_shimmerling-r) - var(--_w) * .55), transparent calc(var(--_shimmerling-r) - var(--_w) * .15));
+}
+.shimmerling-ring-core {
+  background: var(--_core);
+  opacity: .85;
+  -webkit-mask-image: radial-gradient(circle at var(--_ox) var(--_oy), transparent calc(var(--_shimmerling-r) - var(--_w) * .55), #000 calc(var(--_shimmerling-r) - var(--_w) * .3), transparent calc(var(--_shimmerling-r) - var(--_w) * .05));
+          mask-image: radial-gradient(circle at var(--_ox) var(--_oy), transparent calc(var(--_shimmerling-r) - var(--_w) * .55), #000 calc(var(--_shimmerling-r) - var(--_w) * .3), transparent calc(var(--_shimmerling-r) - var(--_w) * .05));
+}
+.shimmerling-ring-warm {
+  background: conic-gradient(from 180deg at var(--_ox) var(--_oy), var(--_a), var(--_a) 25%, var(--_b) 55%, var(--_d) 75%, var(--_a));
+  -webkit-mask-image: radial-gradient(circle at var(--_ox) var(--_oy), transparent calc(var(--_shimmerling-r) - var(--_w) * .45), #000d calc(var(--_shimmerling-r) - var(--_w) * .1), transparent calc(var(--_shimmerling-r) + var(--_w) * .75));
+          mask-image: radial-gradient(circle at var(--_ox) var(--_oy), transparent calc(var(--_shimmerling-r) - var(--_w) * .45), #000d calc(var(--_shimmerling-r) - var(--_w) * .1), transparent calc(var(--_shimmerling-r) + var(--_w) * .75));
+}
+
+.shimmerling-sparks {
+  opacity: calc(var(--_shimmerling-t) * .4);
+  background:
+    radial-gradient(circle, #fff 0 .5px, transparent 1.1px) 7px 11px / 97px 131px,
+    radial-gradient(circle, #fff 0 .4px, transparent 1px) 61px 23px / 149px 83px,
+    radial-gradient(circle, #fff 0 .6px, transparent 1.2px) 19px 67px / 211px 173px,
+    radial-gradient(circle, #fff 0 .4px, transparent 1px) 113px 41px / 127px 239px;
+  -webkit-mask-image: radial-gradient(circle at var(--_ox) var(--_oy), #000 calc(var(--_shimmerling-r) - var(--_w) * 1.2), transparent calc(var(--_shimmerling-r) - var(--_w) * .2));
+          mask-image: radial-gradient(circle at var(--_ox) var(--_oy), #000 calc(var(--_shimmerling-r) - var(--_w) * 1.2), transparent calc(var(--_shimmerling-r) - var(--_w) * .2));
+}
+
+/* colour pooling on the inside of the border after the front leaves */
+/* opacity goes through a custom property: Safari runs plain opacity animations off the main thread,
+   where it mishandles the delayed fade-out and stops repainting the turning gradient */
+.shimmerling-edge { opacity: var(--_shimmerling-o); }
+.shimmerling-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--_shimmerling-angle),
+    var(--_e1), transparent 16%, var(--_e2) 33%, transparent 48%,
+    var(--_e3) 66%, transparent 82%, var(--_e1));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.shimmerling-edge-soft { filter: blur(10px); }
+.shimmerling-edge-soft::before { padding: 8px; }
+/* the glow starts as the front leaves: it fades in, turns at a steady speed for --shimmerling-glow, and fades out at the end */
+.shimmerling-layer.is-playing .shimmerling-edge {
+  --_glow-at: calc(var(--_speed) * .55);
+  animation:
+    shimmerling-spin var(--_glow) linear var(--_glow-at) both,
+    shimmerling-glow-in .35s ease-out var(--_glow-at) forwards,
+    shimmerling-glow-out var(--_glow-fade) ease-in calc(var(--_glow-at) + var(--_glow) - var(--_glow-fade)) forwards;
+}
+@keyframes shimmerling-spin     { from { --_shimmerling-angle: 150deg; } to { --_shimmerling-angle: var(--_spin-to, 330deg); } }
+@keyframes shimmerling-glow-in  { from { --_shimmerling-o: 0; } to { --_shimmerling-o: 1; } }
+@keyframes shimmerling-glow-out { from { --_shimmerling-o: 1; } to { --_shimmerling-o: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmerling-layer { display: none; }
+}
