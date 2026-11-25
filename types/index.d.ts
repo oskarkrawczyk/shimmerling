@@ -1,6 +1,10 @@
-/** Where a wave starts: a click event, an element's centre, a point in the host, or a side. */
+/**
+ * Where a wave starts: a pointer event, an element's centre, a point in the host, the centre or a side.
+ * Left out, or an event without a position, it starts at the latest pointer press (within a second), else the centre.
+ */
 export type ShimmerlingFrom =
   | { clientX: number; clientY: number }
+  | Event
   | Element
   | { x: number; y: number }
   | 'center' | 'top' | 'bottom' | 'left' | 'right';
@@ -35,7 +39,7 @@ export interface ShimmerlingInstance {
   readonly element: HTMLElement;
   /** True when the host was position: static and got position: relative. */
   readonly isStatic: boolean;
-  /** Plays a wave; settles when it and the border glow are done. Returns the running wave's promise while one plays. */
+  /** Plays a wave; settles when it and the border glow are done. Returns the running wave's promise while one plays. Pointer and element positions outside the host move to its nearest edge. */
   play(from?: ShimmerlingFrom): Promise<void>;
   /** Changes options; colours apply right away. */
   update(options: ShimmerlingOptions): void;

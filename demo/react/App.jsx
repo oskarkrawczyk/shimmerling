@@ -4,7 +4,7 @@ import { Shimmerling } from '../../src/shimmerling/react.jsx';
 import { checkLayout } from '../layout-check.js';
 import { PALETTES } from '../palettes.js';
 
-function Case({ title, children, demo }) {
+function Case({ title, children, demo, wide }) {
   const body = useRef(null);
   const [result, setResult] = useState(null);
   useEffect(() => {
@@ -13,7 +13,7 @@ function Case({ title, children, demo }) {
     return () => { live = false; };
   }, []);
   return (
-    <section className="case">
+    <section className={wide ? 'case wide' : 'case'}>
       <h2>{title}</h2>
       <p>{children}</p>
       <div ref={body}>{demo}</div>
@@ -27,6 +27,11 @@ export default function App() {
   const [published, setPublished] = useState(false);
   const [glow, setGlow] = useState(2.4);
   const [clicks, setClicks] = useState(0);
+  const prompt = useRef(null);
+  const [menu, setMenu] = useState(false);
+  const [level, setLevel] = useState('Max');
+  const [warp, setWarp] = useState(0);
+  const [ripple, setRipple] = useState(1);
 
   const all = useRef(new Set());
   const collect = h => { all.current.add(h); return () => all.current.delete(h); };
@@ -192,6 +197,34 @@ export default function App() {
           </div>
         }>
           The first host's only child is text that changes on every click. The second calls <code>e.preventDefault()</code> in its <code>onClick</code>.
+        </Case>
+        <Case wide title="11 · Wide host, menu outside it" demo={<>
+          <Shimmerling className="prompt" trigger={false} ref={keep(prompt)}
+            style={{ ...(warp ? { '--shimmerling-warp': warp } : {}), '--shimmerling-ripple': ripple }}>
+            <span className="muted">Describe a task or ask a question</span>
+            <div className="prompt-bar">
+              <span className="muted">Thinking: {level}</span>
+              <div className="menu-wrap">
+                <button className="ghost" onClick={() => setMenu(m => !m)}>Thinking ▾</button>
+                {menu && (
+                  <div className="menu">
+                    {['None', 'Low', 'Medium', 'High', 'Max'].map(l => (
+                      <button key={l} onClick={() => { setLevel(l); setMenu(false); prompt.current.play(); }}>{l}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Shimmerling>
+          <div className="controls">
+            {['top', 'bottom', 'left', 'right'].map(from => (
+              <button key={from} className="ghost" onClick={() => prompt.current.play(from)}>From {from}</button>
+            ))}
+            <label>Warp <input type="range" min="0" max="300" step="10" value={warp} onChange={e => setWarp(+e.target.value)} /> {warp || 'auto'}</label>
+            <label>Ripple <input type="range" min="0.5" max="12" step="0.5" value={ripple} onChange={e => setRipple(+e.target.value)} /> {ripple}×</label>
+          </div>
+        </>}>
+          The menu items call <code>play()</code> with no position, so the wave starts at the edge nearest the pointer. The side buttons start 20px outside the host. Sliders set <code>--shimmerling-warp</code> and <code>--shimmerling-ripple</code>.
         </Case>
       </div>
     </main>

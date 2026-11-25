@@ -10,6 +10,7 @@
     --shimmerling-e1, -e2, -e3   border glow colours
     --shimmerling-width          rim thickness (default scales with the host, max 110px)
     --shimmerling-warp           how far the front bends, unitless px (default scales with the host)
+    --shimmerling-ripple         how many bumps along the front, as a multiplier (default 1)
     --shimmerling-speed          how long the front takes to cross (default .45s)
     --shimmerling-tail           how long the tint behind the front lingers (default 1.25s)
     --shimmerling-glow           how long the border glow keeps animating, fade-out included (default 2.4s)

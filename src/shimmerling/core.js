@@ -5,7 +5,7 @@
     s.play(from);  s.update({ colors });  s.destroy();
 
   trigger: undefined (click anywhere in the host) | selector | element | () => element | false or null (code only).
-  from: event | element | {x, y} | 'center' | 'top' | 'bottom' | 'left' | 'right'.
+  from: event | element | {x, y} | 'center' | 'top' | 'bottom' | 'left' | 'right'; left out, the latest pointer press.
   colors: { outer: [a, b], inner: [a, b], core, tint, glow: [a, b, c] }, any CSS colour, one colour fills every slot.
   React and Vue wrappers live in react.jsx and vue.js. The CSS custom properties are listed in shimmerling.css.
 */
@@ -24,18 +24,43 @@ function injectStyles(doc) {
 const seconds = v => (v = v.trim()) ? parseFloat(v) / (v.endsWith('ms') ? 1000 : 1) : NaN;
 const GLOW_TURN = 75;   // border glow rotation, degrees per second
 
-// origin in the host's border box, which is the layer's box
+const EDGE_OFFSET = 20;     // side keywords start this far outside the host, so the start isn't a sharp point on the edge
+const PRESS_TTL = 1000;     // play() without a position uses a pointer press at most this old, in ms
+
+// latest pointer press on the page, for play() calls that arrive without a position (menus, custom events);
+// capture phase, so it's recorded even when a menu stops propagation or unmounts the item
+let lastPress = null;
+const tracked = new WeakSet();
+function trackPresses(doc) {
+  if (tracked.has(doc)) return;
+  tracked.add(doc);
+  const press = e => { lastPress = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+  doc.addEventListener('pointerdown', press, true);
+  doc.addEventListener('pointerup', press, true);
+  doc.addEventListener('keydown', () => { lastPress = null; }, true);
+}
+
+const hasPoint = e => typeof e?.clientX === 'number' && !!(e.clientX || e.clientY);
+const clamp = (v, max) => Math.min(Math.max(v, 0), max);
+
+// origin in the host's border box, which is the layer's box; points outside the host move to its nearest edge
 function origin(host, from, w, h) {
   const r = host.getBoundingClientRect();
-  if (typeof from?.clientX === 'number' && (from.clientX || from.clientY)) return [from.clientX - r.left, from.clientY - r.top];
+  const inside = (x, y) => [clamp(x - r.left, w), clamp(y - r.top, h)];
+  if (typeof from === 'string') {
+    const o = EDGE_OFFSET;
+    return { top: [w / 2, -o], bottom: [w / 2, h + o], left: [-o, h / 2], right: [w + o, h / 2] }[from] ?? [w / 2, h / 2];
+  }
   if (from instanceof Element) {
     const t = from.getBoundingClientRect();
-    return [t.left + t.width / 2 - r.left, t.top + t.height / 2 - r.top];
+    return inside(t.left + t.width / 2, t.top + t.height / 2);
   }
-  if (typeof from?.x === 'number') return [from.x, from.y];
-  return {
-    top: [w / 2, 0], bottom: [w / 2, h], left: [0, h / 2], right: [w, h / 2],
-  }[from] ?? [w / 2, h / 2];
+  if (hasPoint(from)) return inside(from.clientX, from.clientY);
+  const isEvent = from instanceof Event || from?.nativeEvent instanceof Event;
+  if (!isEvent && typeof from?.x === 'number') return [from.x, from.y];
+  // nothing, or an event without a position: start where the pointer last pressed, if that was just now
+  if (lastPress && performance.now() - lastPress.t < PRESS_TTL) return inside(lastPress.x, lastPress.y);
+  return [w / 2, h / 2];
 }
 
 // keyboard clicks have no pointer position, so they start from the clicked element instead
@@ -71,6 +96,7 @@ const layerContent = id => `
 export function createShimmerling(host, options = {}) {
   const opts = { ...options };
   injectStyles(host.ownerDocument);
+  trackPresses(host.ownerDocument);
 
   // framework wrappers render an empty layer themselves, so their own updates never remove it
   let layer = host.querySelector(':scope > .shimmerling-layer');
@@ -105,7 +131,9 @@ export function createShimmerling(host, options = {}) {
     const set = parseFloat(cs.getPropertyValue('--shimmerling-warp'));
     const warp = Number.isFinite(set) ? set : Math.min(110, size * .32);
     const pad = Math.ceil(warp * .75) + 8;
-    layer.querySelector('feTurbulence').setAttribute('baseFrequency', `${2.7 / size} ${1.5 / size}`);
+    const ripple = parseFloat(cs.getPropertyValue('--shimmerling-ripple'));
+    const k = ripple > 0 ? ripple : 1;
+    layer.querySelector('feTurbulence').setAttribute('baseFrequency', `${2.7 * k / size} ${1.5 * k / size}`);
     layer.querySelector('feDisplacementMap').setAttribute('scale', warp);
 
     // the glow turns at the same speed however long it lasts

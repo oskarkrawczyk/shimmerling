@@ -102,11 +102,14 @@ await wave.play(buttonElement);  // settles when the wave and border glow are do
 
 `wave` is what `createShimmerling` returns, `ref.current` in React, or the template ref in Vue. `play(from)` accepts:
 
-- a mouse event: starts at the pointer
-- an element: starts at its centre
-- `{ x, y }`: px from the host's top-left corner, border included
-- `'center'`, `'top'`, `'bottom'`, `'left'` or `'right'`
-- nothing: starts at the centre
+- **nothing, or an event without a position** (for example a menu's `onSelect`): starts where the pointer last pressed, if that was in the last second. Otherwise, or after a key press, it starts at the centre.
+- **a mouse or pointer event:** starts at the pointer.
+- **an element:** starts at its centre.
+- **`{ x, y }`:** px from the host's top-left corner, border included. Used as given, so it can start outside the host.
+- **`'center'`:** the centre.
+- **`'top'`, `'bottom'`, `'left'` or `'right'`:** the middle of that side, 20px outside the host so the start isn't a sharp point on the edge.
+
+The wave always starts inside the host or on its edge. A pointer or element outside the host moves to the nearest point on its edge: a menu item 300px below the host starts the wave on its bottom edge, in line with the pointer. The 20px of the side keywords and explicit `{ x, y }` are the exceptions.
 
 While a wave is playing, `play()` returns the running wave's promise instead of starting a new one. The border glow counts as part of the wave, so a long `--shimmerling-glow` delays the next play.
 
@@ -149,10 +152,17 @@ Set them on the host or any ancestor. All are optional.
 | `--shimmerling-e1`, `-e2`, `-e3` | `#f5b638`, `#4aa8ff`, `#b25cff` | Border glow colours (`colors.glow`) |
 | `--shimmerling-width` | 32% of the host's longer side, between 24px and 110px | Rim thickness, as a length: `80px` |
 | `--shimmerling-warp` | 32% of the host's longer side, at most 110 | How far the front bends, in px without a unit: `60` |
+| `--shimmerling-ripple` | `1` | How many bumps along the front, as a multiplier: `2` doubles them |
 | `--shimmerling-speed` | `.45s` | How long the front takes to cross the host |
 | `--shimmerling-tail` | `1.25s` | How long the tint lingers behind the front |
 | `--shimmerling-glow` | `2.4s` | How long the border glow keeps animating, fade-out included |
 | `--shimmerling-glow-fade` | `1.8s` | Length of the glow's fade-out, at the end of `--shimmerling-glow`; capped at `--shimmerling-glow` |
+
+**Displacement:** the bumps in the front scale with the host's longer side. On a wide, short host, such as a text input, they're larger than the host is tall, so the front looks like a smooth arc. Raise `--shimmerling-ripple` to around `6`–`8` to make it bend within the host's height; `--shimmerling-warp` then sets how far it bends.
+
+```jsx
+<Shimmerling style={{ '--shimmerling-ripple': 7 }}>…</Shimmerling>
+```
 
 **Timing:**
 

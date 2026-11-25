@@ -1,6 +1,6 @@
 {
   "name": "shimmerling",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An iridescent, noise-warped wave that sweeps across an element's background and ends in a turning border glow. Plain JS, with React and Vue wrappers.",
   "license": "MIT",
   "author": "Oskar Krawczyk",
